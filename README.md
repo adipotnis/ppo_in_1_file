@@ -16,10 +16,10 @@ Ordered simplest → hardest, so each step runs and is testable before the next 
 - [ ] Set up the single-file skeleton: arg parsing, seeding, device selection
 
 ### Phase 1 — networks
-- [ ] `mlp` builder (list of layer sizes → `nn.Sequential`)
-- [ ] Actor head: `CategoricalActor` for discrete actions (softmax over logits)
-- [ ] Critic head: value network `v(s)` (scalar output)
-- [ ] Combine into an `ActorCritic` (`ac`) module
+- [x] `mlp` builder (list of layer sizes → `nn.Sequential`)
+- [x] Actor head: `CategoricalActor` for discrete actions (softmax over logits)
+- [x] Critic head: value network `v(s)` (scalar output)
+- [x] Combine into an `ActorCritic` (`ac`) module
 
 ### Phase 2 — rollout collection
 - [ ] `PPOBuffer` to store `(obs, act, rew, val, logp)` for a trajectory

@@ -9,7 +9,19 @@ from torch.optim import Adam
 from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
 
-def Actor(nn.Module):
+
+# building blocks
+def mlp(sizes, activation, output_activation=nn.Identity): # use identity to get the last layer's output so we can handle it as needed later
+
+    layers = []
+    for j in range(len(sizes)-1):
+        act = activation if j < len(sizes)-2 else output_activation #for last layer we do not apply activation function
+        layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
+    return nn.Sequential(*layers)
+
+
+# actor
+class Actor(nn.Module):
     def _distribution(self, obs):
         raise NotImplementedError
     
@@ -25,6 +37,80 @@ def Actor(nn.Module):
         if act is not None:
             logp_a = self._log_prob_from_distribution(pi, act)
         return pi, logp_a
+
+class CategoricalActor(Actor):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, cnn=None):
+        super().__init__()
+        self.cnn = cnn
+        self.logits_net = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)
+
+    def _distribution(self, obs):
+        if self.cnn:
+            obs = self.cnn(obs)
+        logits = self.logits_net(obs)
+        return Categorical(logits=logits)
+    
+    def _log_prob_from_distribution(self, pi, act):
+        return pi.log_prob(act)    
+
+class GaussianActor(Actor):
+    pass
+
+# critic
+class Critic(nn.Module):
+    def __init__(self, obs_dim, hidden_sizes, activation, cnn=None):
+        super().__init__()
+        self.cnn = cnn
+        self.v_net = mlp([obs_dim] + list(hidden_sizes) + [1], activation)  # last layer is a single value for the value function
+
+    def forward(self, obs):
+        if self.cnn:
+            obs = self.cnn(obs)
+        return torch.squeeze(self.v_net(obs), -1) # change shape to (batch_size,)
+
+class ActorCritic(nn.Module):
+    def __init__(self, obs_dim, action_space, hidden_sizes=(64,64), activation=nn.ReLU, cnn_enable=False, frames=3):
+        super().__init__()
+        
+        if cnn_enable:
+            cn_net = cnn(frames, activation)
+        else:
+            cn_net = None
+        
+        # policy based on continuous or discrete action space
+        if isinstance(action_space, Box):
+            self.pi = GaussianActor(obs_dim, action_space.shape[0], hidden_sizes, activation, cn_net)
+        elif isinstance(action_space, Discrete):
+            self.pi = CategoricalActor(obs_dim, action_space.n, hidden_sizes, activation, cn_net)
+        else:
+            raise ValueError(f"Invalid action space: {action_space}")
+        
+        self.v = Critic(obs_dim, hidden_sizes, activation, cn_net)
+
+    def step(self, obs):
+        with torch.no_grad():
+            pi = self.pi._distribution(obs)
+            a = pi.sample()
+            logp_a = self.pi._log_prob_from_distribution(pi, a)
+            v = self.v(obs)
+        return a.cpu().numpy(), v.cpu().numpy(), logp_a.cpu().numpy()
+
+
+# def ppo(env_fn, actor_critic=ActorCritic, ac_kwargs=dict(), seed=0, 
+#         steps_per_epoch=6000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
+#         vf_lr=3e-4, train_pi_iters=10, train_v_iters=10, lam=0.97, max_ep_len=6000,
+#         target_kl=0.1, save_freq=10, load_from=None, device='cpu'):
+    
+#     print(locals())
+#     print(open(__file__).read())
+
+#     # Random seed
+#     seed = 42
+#     torch.manual_seed(seed)
+#     np.random.seed(seed)
+
+
+
 
 if __name__ == '__main__':
     import argparse
