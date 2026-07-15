@@ -47,7 +47,7 @@ Ordered simplest → hardest, so each step runs and is testable before the next 
 - [ ] Verify on a continuous control env
 
 ### Phase 7 — learning from pixels
-- [ ] `cnn` feature extractor
+- [x] `cnn` feature extractor — Atari-style conv stack, flatten 
 - [ ] `FramePreStacking` (stack n frames → position/velocity via diffs)
 - [ ] Train on Pong
 

@@ -19,6 +19,14 @@ def mlp(sizes, activation, output_activation=nn.Identity): # use identity to get
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
     return nn.Sequential(*layers)
 
+def cnn(in_channels, activation=nn.ReLU):
+    return nn.Sequential(
+        nn.Conv2d(in_channels=in_channels, out_channels=16, kernel_size=8, stride=4),
+        activation(),
+        nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2),
+        activation(),
+        nn.Flatten()
+    )
 
 # actor
 class Actor(nn.Module):
