@@ -23,7 +23,7 @@ Ordered simplest → hardest, so each step runs and is testable before the next 
 
 ### Phase 2 — rollout collection
 - [x] `PPOBuffer` to store `(obs, act, rew, val, logp)` for a trajectory
-- [ ] `PPOBuffer` -> `path_finish`, `path_finish`
+- [ ] `PPOBuffer` -> `path_finish`, `get`
 - [ ] Collect a fixed number of steps per update by acting in the env
 
 ### Phase 3 — advantage & returns
