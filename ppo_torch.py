@@ -28,6 +28,12 @@ def cnn(in_channels, activation=nn.ReLU):
         nn.Flatten()
     )
 
+
+def shape_combine(length, shape=None):
+    if shape is None:
+        return (length,)
+    return (length, shape) if np.isscalar(shape) else (length, *shape)
+
 # actor
 class Actor(nn.Module):
     def _distribution(self, obs):
@@ -103,6 +109,42 @@ class ActorCritic(nn.Module):
             v = self.v(obs)
         return a.cpu().numpy(), v.cpu().numpy(), logp_a.cpu().numpy()
 
+# ppo buffer
+class PPOBuffer:
+    '''
+    buffer for storing traj experienced by agent. 
+
+    (GAE-Lambda) for calculating the advantages of state-action pairs. 
+    '''
+    def __init__(self, obs_dim, act_dim, size, gamma=0.99, lam=0.95, device='cpu'):
+        self.obs_buf = np.zeros(shape_combine(size, act_dim), dtype=np.float32)
+        self.act_buf = np.zeros(shape_combine(size, act_dim), dtype=np.float32)
+        self.adv_buf = np.zeros(size, dtype=np.float32)
+        self.rew_buf = np.zeros(size, dtype=np.float32)
+        self.ret_buf = np.zeros(size, dtype=np.float32)
+        self.val_buf = np.zeros(size, dtype=np.float32)
+        self.logp_buf = np.zeros(size, dtype=np.float32)
+        self.gamma, self.lam = gamma, lam
+        self.ptr, self.path_start_idx, self.max_size = 0, 0, size
+        self.device = device
+    
+    def store(self, obs, act, rew, val, logp):
+        """
+        append one timestep of agent-environment interaction to the buffer.
+        """
+        assert self.ptr < self.max_size     # needs room to store
+        self.obs_buf[self.ptr] = obs
+        self.act_buf[self.ptr] = act
+        self.rew_buf[self.ptr] = rew
+        self.val_buf[self.ptr] = val
+        self.logp_buf[self.ptr] = logp
+        self.ptr += 1
+
+    def path_finish()
+        pass
+
+    def get()
+        pass
 
 # def ppo(env_fn, actor_critic=ActorCritic, ac_kwargs=dict(), seed=0, 
 #         steps_per_epoch=6000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
