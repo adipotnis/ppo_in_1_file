@@ -38,10 +38,10 @@ def shape_combine(length, shape=None):
 class Actor(nn.Module):
     def _distribution(self, obs):
         raise NotImplementedError
-    
+
     def _log_prob_from_distribution(self, pi, act):
         raise NotImplementedError
-    
+
     def forward(self, obs, act=None):
         # create action distribution for a given obs
         # also compute log likelihood of actors
@@ -63,12 +63,27 @@ class CategoricalActor(Actor):
             obs = self.cnn(obs)
         logits = self.logits_net(obs)
         return Categorical(logits=logits)
-    
+
     def _log_prob_from_distribution(self, pi, act):
-        return pi.log_prob(act)    
+        return pi.log_prob(act)
 
 class GaussianActor(Actor):
-    pass
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, cnn=None):
+        super().__init__()
+        self.cnn = cnn
+        log_std = -0.5 * np.ones(act_dim, dtype=float32) # spinning up initialization 
+        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
+        self.mu_net = mlp([obs_dim]+list(hidden_sizes)+[act_dim], activation)
+
+    def _distribution(self, obs):
+        if self.cnn:
+            obs = self.cnn(obs)
+        mu = self.mu_net(obs)
+        std = torch.exp(self.log_std)       # exponentiate for positive
+        return Normal(mu, std)
+
+    def _log_prob_from_distribution(self, pi, act):
+        return pi.log_prob(act).sum(axis=-1) # sum multivariate gaussian log probs over last axis 
 
 # critic
 class Critic(nn.Module):
@@ -85,12 +100,12 @@ class Critic(nn.Module):
 class ActorCritic(nn.Module):
     def __init__(self, obs_dim, action_space, hidden_sizes=(64,64), activation=nn.ReLU, cnn_enable=False, frames=3):
         super().__init__()
-        
+
         if cnn_enable:
             cn_net = cnn(frames, activation)
         else:
             cn_net = None
-        
+
         # policy based on continuous or discrete action space
         if isinstance(action_space, Box):
             self.pi = GaussianActor(obs_dim, action_space.shape[0], hidden_sizes, activation, cn_net)
@@ -98,7 +113,7 @@ class ActorCritic(nn.Module):
             self.pi = CategoricalActor(obs_dim, action_space.n, hidden_sizes, activation, cn_net)
         else:
             raise ValueError(f"Invalid action space: {action_space}")
-        
+
         self.v = Critic(obs_dim, hidden_sizes, activation, cn_net)
 
     def step(self, obs):
@@ -112,9 +127,9 @@ class ActorCritic(nn.Module):
 # ppo buffer
 class PPOBuffer:
     '''
-    buffer for storing traj experienced by agent. 
+    buffer for storing traj experienced by agent.
 
-    (GAE-Lambda) for calculating the advantages of state-action pairs. 
+    (GAE-Lambda) for calculating the advantages of state-action pairs.
     '''
     def __init__(self, obs_dim, act_dim, size, gamma=0.99, lam=0.95, device='cpu'):
         self.obs_buf = np.zeros(shape_combine(size, act_dim), dtype=np.float32)
@@ -127,7 +142,7 @@ class PPOBuffer:
         self.gamma, self.lam = gamma, lam
         self.ptr, self.path_start_idx, self.max_size = 0, 0, size
         self.device = device
-    
+
     def store(self, obs, act, rew, val, logp):
         """
         append one timestep of agent-environment interaction to the buffer.
@@ -146,11 +161,11 @@ class PPOBuffer:
     def get()
         pass
 
-# def ppo(env_fn, actor_critic=ActorCritic, ac_kwargs=dict(), seed=0, 
+# def ppo(env_fn, actor_critic=ActorCritic, ac_kwargs=dict(), seed=0,
 #         steps_per_epoch=6000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
 #         vf_lr=3e-4, train_pi_iters=10, train_v_iters=10, lam=0.97, max_ep_len=6000,
 #         target_kl=0.1, save_freq=10, load_from=None, device='cpu'):
-    
+
 #     print(locals())
 #     print(open(__file__).read())
 
@@ -181,5 +196,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # ppo(lambda : gym.make(args.env, render_mode='human' if args.render else None), actor_critic=ActorCritic,
-    #     ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), target_kl=args.kl, gamma=args.gamma, 
+    #     ac_kwargs=dict(hidden_sizes=[args.hid]*args.l), target_kl=args.kl, gamma=args.gamma,
     #     seed=args.seed, steps_per_epoch=args.steps, epochs=args.epochs, load_from=args.load_from, device=torch.device(args.device))
